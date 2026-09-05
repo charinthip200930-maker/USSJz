@@ -1,0 +1,290 @@
+-- Thragg Hub Script (Roblox) - Fixed Speed Lock Edition
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local ToggleUIBtn = Instance.new("TextButton")
+local Scroll = Instance.new("ScrollingFrame")
+local UIListLayout = Instance.new("UIListLayout")
+
+ScreenGui.Parent = game.CoreGui
+ScreenGui.Name = "ThraggHub_Gold_v3"
+
+local function AddCorner(parent, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius or 8)
+    corner.Parent = parent
+end
+
+local function AddGoldBorder(parent, thickness)
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = thickness or 1.5
+    stroke.Color = Color3.fromRGB(212, 175, 55)
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = parent
+end
+
+-- ปุ่มเปิด/ปิด เมนูหลัก
+ToggleUIBtn.Name = "ToggleUIBtn"
+ToggleUIBtn.Parent = ScreenGui
+ToggleUIBtn.Position = UDim2.new(0.02, 0, 0.4, 0)
+ToggleUIBtn.Size = UDim2.new(0, 90, 0, 35)
+ToggleUIBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+ToggleUIBtn.Text = "Thragg [GUI]"
+ToggleUIBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
+ToggleUIBtn.Font = Enum.Font.GothamBold
+ToggleUIBtn.TextSize = 13
+ToggleUIBtn.Draggable = true
+AddCorner(ToggleUIBtn, 8)
+AddGoldBorder(ToggleUIBtn, 1.5)
+
+-- หน้าต่างหลัก
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.Position = UDim2.new(0.3, 0, 0.2, 0)
+MainFrame.Size = UDim2.new(0, 250, 0, 420)
+MainFrame.Active = true
+MainFrame.Draggable = true
+AddCorner(MainFrame, 12)
+AddGoldBorder(MainFrame, 2)
+
+Title.Name = "Title"
+Title.Parent = MainFrame
+Title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Title.Size = UDim2.new(1, 0, 0, 42)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "★ THRAGG SCRIPT ★"
+Title.TextColor3 = Color3.fromRGB(255, 215, 0)
+Title.TextSize = 16
+AddCorner(Title, 12)
+
+Scroll.Parent = MainFrame
+Scroll.Position = UDim2.new(0, 8, 0, 50)
+Scroll.Size = UDim2.new(1, -16, 1, -58)
+Scroll.BackgroundTransparency = 1
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 430)
+Scroll.ScrollBarThickness = 4
+Scroll.ScrollBarImageColor3 = Color3.fromRGB(212, 175, 55)
+
+UIListLayout.Parent = Scroll
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 8)
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local NoclipEnabled = false
+local InfJumpEnabled = false
+local InvisibleEnabled = false
+local ESPEnabled = false
+local AimbotEnabled = false
+local TargetSpeed = 16 -- ค่าความเร็วเริ่มต้น
+
+local function CreateButton(text)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -6, 0, 36)
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    btn.Text = text .. ": OFF"
+    btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 13
+    btn.Parent = Scroll
+    AddCorner(btn, 6)
+    AddGoldBorder(btn, 1)
+    return btn
+end
+
+ToggleUIBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+-- 1. มองเห็นผู้เล่นทะลุ
+local ESPBtn = CreateButton("มองเห็นผู้เล่นทะลุ")
+local function ApplyESP(player)
+    if player ~= LocalPlayer and player.Character then
+        local highlight = player.Character:FindFirstChild("ThraggESP")
+        if not highlight then
+            highlight = Instance.new("Highlight")
+            highlight.Name = "ThraggESP"
+            highlight.FillColor = Color3.fromRGB(255, 215, 0)
+            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+            highlight.FillTransparency = 0.5
+            highlight.OutlineTransparency = 0
+            highlight.Adornee = player.Character
+            highlight.Parent = player.Character
+        end
+        highlight.Enabled = ESPEnabled
+    end
+end
+
+ESPBtn.MouseButton1Click:Connect(function()
+    ESPEnabled = not ESPEnabled
+    ESPBtn.Text = "มองเห็นผู้เล่นทะลุ: " .. (ESPEnabled and "ON" or "OFF")
+    ESPBtn.BackgroundColor3 = ESPEnabled and Color3.fromRGB(180, 140, 20) or Color3.fromRGB(25, 25, 25)
+    ESPBtn.TextColor3 = ESPEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(220, 220, 220)
+    for _, plr in pairs(Players:GetPlayers()) do ApplyESP(plr) end
+end)
+
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        if ESPEnabled then ApplyESP(plr) end
+    end)
+end)
+
+-- 2. ล็อคเป้าผู้เล่น
+local AimbotBtn = CreateButton("ล็อคเป้าผู้เล่น")
+local function GetClosestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
+            local pos, onScreen = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+            if onScreen then
+                local mousePos = UserInputService:GetMouseLocation()
+                local distance = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestPlayer = player
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+AimbotBtn.MouseButton1Click:Connect(function()
+    AimbotEnabled = not AimbotEnabled
+    AimbotBtn.Text = "ล็อคเป้าผู้เล่น: " .. (AimbotEnabled and "ON" or "OFF")
+    AimbotBtn.BackgroundColor3 = AimbotEnabled and Color3.fromRGB(180, 140, 20) or Color3.fromRGB(25, 25, 25)
+    AimbotBtn.TextColor3 = AimbotEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(220, 220, 220)
+end)
+
+RunService.RenderStepped:Connect(function()
+    if AimbotEnabled then
+        local target = GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
+        end
+    end
+end)
+
+-- 3. ล่องหน
+local InvisibleBtn = CreateButton("ล่องหน")
+InvisibleBtn.MouseButton1Click:Connect(function()
+    InvisibleEnabled = not InvisibleEnabled
+    local char = LocalPlayer.Character
+    if char then
+        for _, v in pairs(char:GetDescendants()) do
+            if v:IsA("BasePart") or v:IsA("Decal") then
+                if v.Name ~= "HumanoidRootPart" then
+                    v.Transparency = InvisibleEnabled and 1 or 0
+                end
+            end
+        end
+    end
+    InvisibleBtn.Text = "ล่องหน: " .. (InvisibleEnabled and "ON" or "OFF")
+    InvisibleBtn.BackgroundColor3 = InvisibleEnabled and Color3.fromRGB(180, 140, 20) or Color3.fromRGB(25, 25, 25)
+    InvisibleBtn.TextColor3 = InvisibleEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(220, 220, 220)
+end)
+
+-- 4. เดินทะลุกำแพง
+local NoclipBtn = CreateButton("เดินทะลุกำแพง")
+NoclipBtn.MouseButton1Click:Connect(function()
+    NoclipEnabled = not NoclipEnabled
+    NoclipBtn.Text = "เดินทะลุกำแพง: " .. (NoclipEnabled and "ON" or "OFF")
+    NoclipBtn.BackgroundColor3 = NoclipEnabled and Color3.fromRGB(180, 140, 20) or Color3.fromRGB(25, 25, 25)
+    NoclipBtn.TextColor3 = NoclipEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(220, 220, 220)
+end)
+
+RunService.Stepped:Connect(function()
+    if NoclipEnabled and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+-- 5. กระโดดไม่จำกัด
+local InfJumpBtn = CreateButton("กระโดดไม่จำกัด")
+InfJumpBtn.MouseButton1Click:Connect(function()
+    InfJumpEnabled = not InfJumpEnabled
+    InfJumpBtn.Text = "กระโดดไม่จำกัด: " .. (InfJumpEnabled and "ON" or "OFF")
+    InfJumpBtn.BackgroundColor3 = InfJumpEnabled and Color3.fromRGB(180, 140, 20) or Color3.fromRGB(25, 25, 25)
+    InfJumpBtn.TextColor3 = InfJumpEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(220, 220, 220)
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if InfJumpEnabled and LocalPlayer.Character then
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+-- 6. ปรับความเร็วแบบล็อคถาวร (Permanent Speed Lock)
+local SpeedFrame = Instance.new("Frame")
+SpeedFrame.Size = UDim2.new(1, -6, 0, 40)
+SpeedFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+SpeedFrame.Parent = Scroll
+AddCorner(SpeedFrame, 6)
+AddGoldBorder(SpeedFrame, 1)
+
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Size = UDim2.new(0.55, 0, 1, 0)
+SpeedLabel.Position = UDim2.new(0.05, 0, 0, 0)
+SpeedLabel.Text = "ความเร็ว (1-1000):"
+SpeedLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+SpeedLabel.BackgroundTransparency = 1
+SpeedLabel.Font = Enum.Font.GothamSemibold
+SpeedLabel.TextSize = 12
+SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+SpeedLabel.Parent = SpeedFrame
+
+local SpeedBox = Instance.new("TextBox")
+SpeedBox.Position = UDim2.new(0.62, 0, 0.15, 0)
+SpeedBox.Size = UDim2.new(0.33, 0, 0.7, 0)
+SpeedBox.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+SpeedBox.Text = "16"
+SpeedBox.TextColor3 = Color3.fromRGB(255, 215, 0)
+SpeedBox.Font = Enum.Font.GothamBold
+SpeedBox.TextSize = 13
+SpeedBox.Parent = SpeedFrame
+AddCorner(SpeedBox, 4)
+AddGoldBorder(SpeedBox, 1)
+
+SpeedBox.FocusLost:Connect(function()
+    local val = tonumber(SpeedBox.Text)
+    if val then
+        if val > 1000 then val = 1000 end
+        if val < 1 then val = 1 end
+        TargetSpeed = val
+        SpeedBox.Text = tostring(val)
+    else
+        SpeedBox.Text = tostring(TargetSpeed)
+    end
+end)
+
+-- ระบบบังคับความเร็วตลอดเวลา (บังคับเขียนทับทุกเฟรม)
+RunService.Stepped:Connect(function()
+    if LocalPlayer.Character then
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.WalkSpeed ~= TargetSpeed then
+            humanoid.WalkSpeed = TargetSpeed
+        end
+    end
+end)
+
+-- ตรวจจับเมื่อตัวละครเกิดใหม่ ให้ใส่ค่าความเร็วเดิมทันที
+LocalPlayer.CharacterAdded:Connect(function(char)
+    local humanoid = char:WaitForChild("Humanoid", 5)
+    if humanoid then
+        humanoid.WalkSpeed = TargetSpeed
+    end
+end)
